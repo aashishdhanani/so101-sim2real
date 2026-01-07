@@ -1,0 +1,10 @@
+[project]
+name = "so101-sim2real"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "isaaclab>=2.3.1",
+    "isaacsim[all,extscache]==5.1.0",
+]
