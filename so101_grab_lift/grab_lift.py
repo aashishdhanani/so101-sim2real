@@ -72,7 +72,7 @@ SO101_CONFIG = ArticulationCfg(
     },
 )
 
-class NewRobotsSceneCfg(InteractiveSceneCfg):
+class GrabLiftSceneCfg(InteractiveSceneCfg):
     """Designs the scene."""
 
     # Ground-plane
@@ -85,7 +85,18 @@ class NewRobotsSceneCfg(InteractiveSceneCfg):
 
     #add assets here for like a block/object to be picked up - lets just do cube
     cuboid = AssetBaseCfg(
-        prim_path="/World/Objects/Cuboid", spawn=sim_utils.CuboidCfg(size=(0.1,0.1,0.1))
+        prim_path="{ENV_REGEX_NS}/Cuboid",  # Use ENV_REGEX_NS placeholder
+        spawn=sim_utils.CuboidCfg(
+            size=(0.05, 0.05, 0.05),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity=False),
+            collision_props=sim_utils.CollisionPropertiesCfg(
+                collision_enabled=True,
+            ),
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0.3, 0.0, 0.05),  # Position relative to each environment origin
+            rot=(1.0, 0.0, 0.0, 0.0),
+        ),
     )
 
     # robot - set prim_path directly with the ENV_REGEX_NS placeholder
@@ -102,31 +113,42 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
     while simulation_app.is_running():
         # reset
-        if count % 500 == 0:
-            # reset counters
-            count = 0
-            # reset the scene entities to their initial positions offset by the environment origins
-            root_so101_state = scene["so101"].data.default_root_state.clone()
-            root_so101_state[:, :3] += scene.env_origins
+        # if count % 500 == 0:
+        #      reset counters
+        #     count = 0
+        #      reset the scene entities to their initial positions offset by the environment origins
+        #     root_so101_state = scene["so101"].data.default_root_state.clone()
+        #     root_so101_state[:, :3] += scene.env_origins
 
-            # copy the default root state to the sim for the jetbot's orientation and velocity
-            scene["so101"].write_root_pose_to_sim(root_so101_state[:, :7])
-            scene["so101"].write_root_velocity_to_sim(root_so101_state[:, 7:])
+        #      #reset cube
+        #      cube_state = scene["cuboid"].data.default_root_state.clone()
+        #      cube_state[:, :3] += scene.env_origins
 
-            # copy the default joint states to the sim
-            joint_pos, joint_vel = (
-                scene["so101"].data.default_joint_pos.clone(),
-                scene["so101"].data.default_joint_vel.clone(),
-            )
-            scene["so101"].write_joint_state_to_sim(joint_pos, joint_vel)
+        #      copy the default root state to the sim for the jetbot's orientation and velocity
+        #     scene["so101"].write_root_pose_to_sim(root_so101_state[:, :7])
+        #     scene["so101"].write_root_velocity_to_sim(root_so101_state[:, 7:])
 
-            #grab and lift sequence then reset environment
+        #      scene["cuboid"].write_root_pose_to_sim(cube_state[:, :7])
+        #      scene["cuboid"].write_root_velocity_to_sim(cube_state[:, 7:])
+
+        #     copy the default joint states to the sim
+        #     joint_pos, joint_vel = (
+        #         scene["so101"].data.default_joint_pos.clone(),
+        #         scene["so101"].data.default_joint_vel.clone(),
+        #     )
+        #     scene["so101"].write_joint_state_to_sim(joint_pos, joint_vel)
+
+        #     grab and lift sequence then reset environment, deterministically move robot to pick up the cube and lift it up and then reset.
 
 
 
-            # clear internal buffers
-            scene.reset()
-            print("[INFO]: Resetting so101 state...")
+        #     clear internal buffers
+        #     scene.reset()
+        #     print("[INFO]: Resetting so101 and cuboid state...")
+
+
+        #determinisitic grab + lift
+        
 
         scene.write_data_to_sim()
         sim.step()
@@ -139,7 +161,7 @@ def main():
     sim = sim_utils.SimulationContext(sim_cfg)
     sim.set_camera_view((3.5, 0.0, 3.2), (0.0, 0.0, 0.5))
     # Design scene
-    scene_cfg = NewRobotsSceneCfg(args_cli.num_envs, env_spacing=2.0)
+    scene_cfg = GrabLiftSceneCfg(args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()
