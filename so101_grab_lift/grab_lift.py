@@ -21,6 +21,7 @@ simulation_app = app_launcher.app
 import numpy as np
 import torch
 import os
+import time
 
 
 import isaaclab.sim as sim_utils
@@ -29,6 +30,7 @@ from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.sim.converters import UrdfConverter, UrdfConverterCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.assets import AssetBaseCfg
+from isaaclab.devices import Se3KeyboardCfg, Se3Keyboard, Se3GamepadCfg, Se3Gamepad
 
 # Convert URDF to USD
 urdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "robot", "so101_new_calib.urdf"))
@@ -111,50 +113,72 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     sim_time = 0.0
     count = 0
 
+    keyboard = Se3Keyboard(Se3KeyboardCfg("cpu"))
+    joint_targets = scene["so101"].data.default_joint_pos.clone()
+    joint_step = 0.01
+
+    # Track key state: True = key is being held, False = released
+    key_states = {}
+    key_timeout = 0.15  # If no press event for this long, consider key released
+    
+    # Key mappings
+    key_mappings = [
+        ("LEFT", 0, -1), ("RIGHT", 0, 1),
+        ("DOWN", 1, -1), ("UP", 1, 1),
+        ("NUMPAD_2", 2, -1), ("NUMPAD_5", 2, 1),
+        ("NUMPAD_4", 3, -1), ("NUMPAD_6", 3, 1),
+        ("NUMPAD_7", 4, -1), ("NUMPAD_9", 4, 1),
+        ("NUMPAD_8", 5, -1), ("NUMPAD_ENTER", 5, 1),
+    ]
+    
+    # Set up callbacks to track key presses
+    for key_name, joint_idx, direction in key_mappings:
+        key_id = f"joint_{joint_idx}_{'inc' if direction > 0 else 'dec'}"
+        keyboard.add_callback(key_name, lambda k=key_id: key_states.update({k: time.time()}))
+        key_states[key_id] = 0  # Initialize to 0 (not pressed)
+    
+    # Get joint limits from the robot
+    joint_limits = scene["so101"].data.joint_limits  # Shape: [num_envs, num_joints, 2] where [:, :, 0] is lower, [:, :, 1] is upper
+    
+    print("[INFO]: Hold keys for continuous movement. Movement stops at joint limits.")
+
     while simulation_app.is_running():
-        # reset
-        # if count % 500 == 0:
-        #      reset counters
-        #     count = 0
-        #      reset the scene entities to their initial positions offset by the environment origins
-        #     root_so101_state = scene["so101"].data.default_root_state.clone()
-        #     root_so101_state[:, :3] += scene.env_origins
-
-        #      #reset cube
-        #      cube_state = scene["cuboid"].data.default_root_state.clone()
-        #      cube_state[:, :3] += scene.env_origins
-
-        #      copy the default root state to the sim for the jetbot's orientation and velocity
-        #     scene["so101"].write_root_pose_to_sim(root_so101_state[:, :7])
-        #     scene["so101"].write_root_velocity_to_sim(root_so101_state[:, 7:])
-
-        #      scene["cuboid"].write_root_pose_to_sim(cube_state[:, :7])
-        #      scene["cuboid"].write_root_velocity_to_sim(cube_state[:, 7:])
-
-        #     copy the default joint states to the sim
-        #     joint_pos, joint_vel = (
-        #         scene["so101"].data.default_joint_pos.clone(),
-        #         scene["so101"].data.default_joint_vel.clone(),
-        #     )
-        #     scene["so101"].write_joint_state_to_sim(joint_pos, joint_vel)
-
-        #     grab and lift sequence then reset environment, deterministically move robot to pick up the cube and lift it up and then reset.
-
-
-
-        #     clear internal buffers
-        #     scene.reset()
-        #     print("[INFO]: Resetting so101 and cuboid state...")
-
-
-        #determinisitic grab + lift
+        keyboard.advance()
         
-
+        current_time = time.time()
+        
+        # Apply continuous movement for keys that are being held
+        for joint_idx in range(6):
+            inc_key = f"joint_{joint_idx}_inc"
+            dec_key = f"joint_{joint_idx}_dec"
+            
+            # Check if key is being held (pressed recently)
+            inc_held = (current_time - key_states.get(inc_key, 0)) < key_timeout
+            dec_held = (current_time - key_states.get(dec_key, 0)) < key_timeout
+            
+            # Get current joint limits for this joint
+            lower_limit = joint_limits[0, joint_idx, 0].item()
+            upper_limit = joint_limits[0, joint_idx, 1].item()
+            current_pos = joint_targets[0, joint_idx].item()
+            
+            # Apply movement if key is held and within limits
+            if inc_held and current_pos < upper_limit:
+                new_pos = current_pos + joint_step
+                if new_pos <= upper_limit:  # Check before applying
+                    joint_targets[:, joint_idx] += joint_step
+                    
+            if dec_held and current_pos > lower_limit:
+                new_pos = current_pos - joint_step
+                if new_pos >= lower_limit:  # Check before applying
+                    joint_targets[:, joint_idx] -= joint_step
+        
+        scene["so101"].set_joint_position_target(joint_targets)
         scene.write_data_to_sim()
         sim.step()
         sim_time += sim_dt
         count += 1
         scene.update(sim_dt)
+
 
 def main():
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
@@ -165,6 +189,10 @@ def main():
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()
+
+    num_joints = scene["so101"].data.default_joint_pos.shape[1]
+    print(f"[INFO]: Number of joints: {num_joints}")
+
     # Now we are ready!
     print("[INFO]: Setup complete...")
     # Run the simulator
