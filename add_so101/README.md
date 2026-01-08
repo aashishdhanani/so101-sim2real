@@ -1,7 +1,5 @@
 # Adding the SO101 Robot to Isaac Lab
 
-This project successfully demonstrates how to add a custom robot (the SO101 robotic arm) to an Isaac Lab simulation environment. The robot is loaded from a URDF file, converted to USD format, and then simulated with a simple wave motion demonstration.
-
 ## Overview
 
 The script `add_so101.py` accomplishes the following:
@@ -176,21 +174,6 @@ def main():
 - Sets up the camera view (eye position and target position)
 - Creates the scene with the specified number of environments
 - Resets the simulation and starts the main loop
-
-## File Structure
-
-```
-so101-sim2real/
-├── robot/
-│   ├── so101_new_calib.urdf      # Robot description file
-│   └── assets/                    # STL mesh files referenced by URDF
-│       ├── base_motor_holder_so101_v1.stl
-│       ├── base_so101_v2.stl
-│       └── ... (other STL files)
-└── add_so101/
-    ├── add_so101.py               # Main script
-    └── README.md                  # This file
-```
 
 ## Running the Simulation
 
