@@ -86,3 +86,59 @@ Algorithm step by step:
 3. DONE
 
 8. Analysis and Evaluation
+
+Configuration for a manipulation scene with a robot, object, table, and environment elements.
+
+## Components
+
+### `robot: ArticulationCfg`
+The robot arm in the scene.
+- **Type**: Articulation (multi-joint robot)
+- **Purpose**: The manipulator that performs the task
+- **Example**: SO101 arm, Franka Panda, etc.
+- **Must be set**: Yes (defined in agent-specific config)
+
+### `ee_frame: FrameTransformerCfg`
+Sensor that tracks the end-effector (gripper) position and orientation.
+- **Type**: Frame Transformer Sensor
+- **Purpose**: Tracks where the gripper is relative to the robot base
+- **Used for**: Computing rewards (distance to object), observations
+- **Key info**: 
+  - Source frame: Robot base link (e.g., `base_link`)
+  - Target frame: End-effector link (e.g., `gripper_link` or `gripper_frame_link`)
+  - TCP offset: Position offset from link origin to tool center point
+- **Must be set**: Yes (defined in agent-specific config)
+
+### `object: RigidObjectCfg | DeformableObjectCfg`
+The object being manipulated (e.g., cube, box).
+- **Type**: Rigid or Deformable Object
+- **Purpose**: The item the robot picks up/manipulates
+- **Used for**: 
+  - Rewards (reaching, lifting, goal tracking)
+  - Observations (object position)
+  - Events (resetting object position)
+  - Terminations (object dropping)
+- **Must be set**: Yes (defined in agent-specific config)
+
+### `table: AssetBaseCfg`
+The table/work surface in the scene.
+- **Type**: Static Asset
+- **Purpose**: Surface where objects are placed
+- **Spawn**: USD file from Isaac Nucleus (`SeattleLabTable`)
+- **Position**: `(0.5, 0, 0)` with rotation `(0.707, 0, 0, 0.707)`
+- **Inherited**: Yes (already defined in base class)
+
+### `plane: AssetBaseCfg`
+The ground plane.
+- **Type**: Static Asset
+- **Purpose**: Floor/ground of the scene
+- **Spawn**: Built-in ground plane
+- **Position**: `(0, 0, -1.05)` (1.05m below origin)
+- **Inherited**: Yes (already defined in base class)
+
+### `light: AssetBaseCfg`
+Scene lighting.
+- **Type**: Light Asset
+- **Purpose**: Illuminates the scene
+- **Spawn**: Dome light with color `(0.75, 0.75, 0.75)` and intensity `3000.0`
+- **Inherited**: Yes (already defined in base class)
