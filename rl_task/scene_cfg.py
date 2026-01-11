@@ -1,25 +1,5 @@
 import os
 
-import argparse
-
-from isaaclab.app import AppLauncher
-
-# add argparse arguments
-parser = argparse.ArgumentParser(
-    description="This script demonstrates adding a custom robot to an Isaac Lab environment."
-)
-parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
-
-# append AppLauncher cli args
-AppLauncher.add_app_launcher_args(parser)
-
-# parse the arguments
-args_cli = parser.parse_args()
-
-# launch omniverse app
-app_launcher = AppLauncher(args_cli)
-simulation_app = app_launcher.app
-
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, DeformableObjectCfg, RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
@@ -122,40 +102,3 @@ class Scene(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-    
-def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
-    sim_dt = sim.get_physics_dt()
-    sim_time = 0.0
-    count = 0
-
-    while simulation_app.is_running():
-
-        scene.write_data_to_sim()
-        sim.step()
-        sim_time += sim_dt
-        count += 1
-        scene.update(sim_dt)
-
-def main():
-    sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
-    sim = sim_utils.SimulationContext(sim_cfg)
-    sim.set_camera_view((3.5, 0.0, 3.2), (0.0, 0.0, 0.5))
-    # Design scene
-    scene_cfg = Scene(args_cli.num_envs, env_spacing=2.0)
-    scene = InteractiveScene(scene_cfg)
-    # Play the simulator
-    sim.reset()
-
-    num_joints = scene["robot"].data.default_joint_pos.shape[1]
-    print(f"[INFO]: Number of joints: {num_joints}")
-
-    # Now we are ready!
-    print("[INFO]: Setup complete...")
-    # Run the simulator
-    run_simulator(sim, scene)
-
-if __name__ == "__main__":
-
-    main()
-
-    simulation_app.close()
