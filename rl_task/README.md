@@ -142,3 +142,80 @@ Scene lighting.
 - **Purpose**: Illuminates the scene
 - **Spawn**: Dome light with color `(0.75, 0.75, 0.75)` and intensity `3000.0`
 - **Inherited**: Yes (already defined in base class)
+
+
+## Designing the RL ENV - observations class. observation class is what the agent needs to have in order to make desicisons about its environment
+initially, i thought that this is all i needed:
+
+- all joint positions and velocities
+- End effector position
+- object position
+
+now, since this is a reach grasp lift, we have
+REACH - move EE towards object
+- where is the object?
+- where is the EE
+- join pos/velocities
+- i think have (object - EE) relative position is fine initially
+
+GRASP - Close gripper at the right time
+- is the EE close enough?
+- is the EE aligned?
+- 
+
+LIFT - lift the object
+- is the object grasped?
+- how high is it?
+- need to know if gripper is closed
+
+INITIAL OBSERVATION STATE:
+    minimal observation needed:
+    1. robot joint positions + velocities
+    2. EE position + object position 
+    3. gripper open/close state
+
+how am i getting the robot data? 
+scene['robot'] is Articulation object (meaning that its a state of being connected via joints)
+access data via: scene['robot'].data.joint_pos etc...
+
+
+ACTION SPACE - define all possible moves the robot can make
+joints 1 - 5 for moving the body
+joints 6 for opening and closing the gripper
+
+delta vs absolute positions:
+- delta: displacement from last relative positon
+- absolute: fixed static position
+
+----------restart
+isaaclab has a manager class that has built in rl envs to help
+
+Observation Manager class:
+1. ObservationTerm: function with return (num_envs, D)
+manager will figure out when to call it, figures out which robot, 
+
+SceneEntityCfg: 
+
+SceneEntityCfg(
+    name="so101",
+    joint_names=["joint1", "joint2", "joint3", "joint4", "joint5"]
+)
+
+observation manager will resolve names to indices
+
+ObservationTermCfg:
+
+ObservationTermCfg(
+    func=joint_pos,
+    params={
+        "asset_cfg": SceneEntityCfg(
+            name="so101",
+            joint_names=".*"   # regex allowed
+        )
+    },
+    scale=1.0,
+    clip=(-1.0, 1.0),
+    history_length=0
+)
+
+changed observation class to config class to use ObsTerm and ObsGroup
