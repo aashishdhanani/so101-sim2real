@@ -219,3 +219,18 @@ ObservationTermCfg(
 )
 
 changed observation class to config class to use ObsTerm and ObsGroup
+
+How does observation manager fit in overall flow:
+- define observationscfg - what you are creating
+- manaagerbasedenv creates observationsmanager from my config
+- each step, manager calls observation functions
+- computed observations are passed to RL policy
+
+
+"create all the environment configs so that manager based RL env can use when PPO training"
+
+for actions:
+you have the actionsTermCfg for the configuration for each action term
+there are a couple of joing position actions, need to figure out which are the best for my use case right now
+
+
