@@ -233,4 +233,11 @@ for actions:
 you have the actionsTermCfg for the configuration for each action term
 there are a couple of joing position actions, need to figure out which are the best for my use case right now
 
+found the jointpositiontolimitsactioncfg class that has an auto limit enforcement so that joints don't go out of bounds
 
+for rewards:
+- Reach
+- Grasp + bonus if the gripper closes and the cube is between the fingers
+- Lift
+
+events are for resetting the environment. randomly placing the object around for better generalization when doing inference.

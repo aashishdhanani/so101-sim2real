@@ -29,7 +29,7 @@ converter = UrdfConverter(cfg=cfg)
 usd_path = converter.usd_path
 
 
-class Scene(InteractiveSceneCfg):
+class SceneCfg(InteractiveSceneCfg):
 
     robot = ArticulationCfg(
         prim_path="{ENV_REGEX_NS}/So101",

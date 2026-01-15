@@ -11,6 +11,7 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.envs import mdp
 import torch
@@ -84,7 +85,7 @@ class ObservationsCfg:
         ),
     policy = PolicyCfg()
 
-class ActionCfg:
+class ActionsCfg:
     arm_joints = JointPositionToLimitsActionCfg(
         asset_name="robot",
         joint_names=[
@@ -190,9 +191,38 @@ class RewardsCfg:
         } 
     )
 
-class TerminationCfg:
+class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     out_of_bounds = DoneTerm(
         func=mdp.joint_pos_out_of_limit,
         params = {"asset_cfg" : SceneEntityCfg("robot", joint_names=[".*"])}
+    )
+
+class EventsCfg:
+    # Reset robot joints
+    reset_robot = EventTerm(
+        func=mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg(name="robot", joint_names=[".*"])
+        }
+    )
+    
+    # Reset object with randomized position
+    reset_object = EventTerm(
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg(name="object"),
+            "pose_range": {
+                "x": (-0.2, 0.2), 
+                "y": (-0.2, 0.2),  
+                "z": (-0.005, 0.045)  
+            },
+            "velocity_range": {
+                "x": (0.0, 0.0),
+                "y": (0.0, 0.0),
+                "z": (0.0, 0.0)
+            }
+        }
     )

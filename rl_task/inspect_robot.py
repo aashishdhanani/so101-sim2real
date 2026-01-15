@@ -1,118 +1,117 @@
-"""Script to inspect the structure of scene["robot"] and object"""
-
-import os
-import sys
+# sample_reach.py
 from isaaclab.app import AppLauncher
-
-# Launch the simulator
 app_launcher = AppLauncher(headless=True)
 simulation_app = app_launcher.app
 
 import isaaclab.sim as sim_utils
 from isaaclab.scene import InteractiveScene
 from scene_cfg import Scene
+import torch
+import numpy as np
 
-def inspect_robot():
-    """Inspect and print the structure of scene["robot"] and object"""
-    
-    # Create simulation
+def sample_reachable_positions(num_samples=1000):
+    """Sample random joint configurations and record EE positions."""
     sim_cfg = sim_utils.SimulationCfg(device="cpu")
     sim = sim_utils.SimulationContext(sim_cfg)
     
-    # Create scene with 1 environment
     scene_cfg = Scene(num_envs=1, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
-    
-    # Reset simulation
     sim.reset()
     scene.update(0.0)  # Update scene to populate data
     
-    # Access the robot
     robot = scene["robot"]
-    print("=" * 80)
-    print("ROBOT JOINT POSITIONS:")
-    print("=" * 80)
-    print(f"Shape: {robot.data.joint_pos.shape}")
-    print(f"Values: {robot.data.joint_pos}")
-    print()
+    ee_frame = scene["ee_frame"]
     
-    # Access the object
-    print("=" * 80)
-    print("OBJECT ASSET INSPECTION:")
-    print("=" * 80)
-    object_asset = scene["object"]
-    print(f"Object type: {type(object_asset)}")
-    print(f"Object type name: {type(object_asset).__name__}")
-    print()
+    # Get joint limits - need to access correctly
+    # Joint limits shape: (num_envs, num_joints, 2) where last dim is [lower, upper]
+    num_joints = robot.num_joints
+    print(f"Robot has {num_joints} joints")
     
-    # Check if object has data attribute
-    if hasattr(object_asset, 'data'):
-        print("=" * 80)
-        print("OBJECT.DATA ATTRIBUTES:")
-        print("=" * 80)
-        data_attrs = [attr for attr in dir(object_asset.data) if not attr.startswith('_')]
-        for attr in sorted(data_attrs):
-            try:
-                value = getattr(object_asset.data, attr)
-                if not callable(value):
-                    if hasattr(value, 'shape'):
-                        print(f"  {attr}: shape={value.shape}, dtype={value.dtype}")
-                    elif hasattr(value, '__len__'):
-                        try:
-                            print(f"  {attr}: len={len(value)}")
-                        except:
-                            print(f"  {attr}: {type(value).__name__}")
-                    else:
-                        print(f"  {attr}: {type(value).__name__}")
-            except Exception as e:
-                print(f"  {attr}: <error accessing: {e}>")
-        print()
+    # Get default joint positions to understand the range
+    default_joint_pos = robot.data.default_joint_pos[0].cpu().numpy()
+    print(f"Default joint positions: {default_joint_pos}")
     
-    # Inspect root position (world position)
-    print("=" * 80)
-    print("OBJECT POSITION (root_pos_w):")
-    print("=" * 80)
-    if hasattr(object_asset, 'data') and hasattr(object_asset.data, 'root_pos_w'):
-        root_pos = object_asset.data.root_pos_w
-        print(f"Shape: {root_pos.shape}")
-        print(f"Dtype: {root_pos.dtype}")
-        print(f"Full tensor: {root_pos}")
-        print()
-        
-        # For single environment
-        if root_pos.shape[0] == 1:
-            pos = root_pos[0]  # First (and only) environment
-            print(f"Position for env 0: {pos}")
-            print(f"  Index 0 (X): {pos[0].item():.6f} meters")
-            print(f"  Index 1 (Y): {pos[1].item():.6f} meters")
-            print(f"  Index 2 (Z/HEIGHT): {pos[2].item():.6f} meters")
-            print()
-            print("=" * 80)
-            print("HEIGHT INFORMATION:")
-            print("=" * 80)
-            print(f"Height (Z-coordinate) is at index 2")
-            print(f"Current height: {pos[2].item():.6f} meters")
-            print(f"Expected initial height from scene_cfg: 0.055 meters")
-            print(f"Difference: {pos[2].item() - 0.055:.6f} meters")
+    # Try to get joint limits - may need to access differently
+    try:
+        if hasattr(robot.data, 'joint_limits'):
+            joint_limits = robot.data.joint_limits[0].cpu().numpy()  # (num_joints, 2)
+            print(f"Joint limits shape: {joint_limits.shape}")
+            print(f"Joint limits:\n{joint_limits}")
         else:
-            # Multiple environments
-            print(f"Multiple environments ({root_pos.shape[0]}):")
-            for env_idx in range(root_pos.shape[0]):
-                pos = root_pos[env_idx]
-                print(f"  Env {env_idx}: X={pos[0].item():.6f}, Y={pos[1].item():.6f}, Z={pos[2].item():.6f}")
-    else:
-        print("ERROR: root_pos_w not found in object.data")
-        print("Available attributes:", dir(object_asset.data) if hasattr(object_asset, 'data') else "No data attribute")
+            # Fallback: use URDF limits or hardcode based on your URDF
+            # From your URDF: shoulder_pan: [-1.91986, 1.91986], etc.
+            joint_limits = np.array([
+                [-1.91986, 1.91986],  # shoulder_pan
+                [-1.74533, 1.74533],  # shoulder_lift
+                [-1.69, 1.69],        # elbow_flex
+                [-1.65806, 1.65806],  # wrist_flex
+                [-2.74385, 2.84121],  # wrist_roll
+                [-0.174533, 1.74533]  # gripper
+            ])
+            print("Using hardcoded joint limits from URDF")
+    except Exception as e:
+        print(f"Error accessing joint limits: {e}")
+        # Use hardcoded limits as fallback
+        joint_limits = np.array([
+            [-1.91986, 1.91986],
+            [-1.74533, 1.74533],
+            [-1.69, 1.69],
+            [-1.65806, 1.65806],
+            [-2.74385, 2.84121],
+            [-0.174533, 1.74533]
+        ])
     
+    reachable_positions = []
+    
+    print(f"\nSampling {num_samples} random configurations...")
+    
+    for i in range(num_samples):
+        # Sample random joint positions within limits
+        joint_pos = torch.zeros(1, num_joints, device=sim.device)
+        
+        for j in range(num_joints):
+            lower = joint_limits[j, 0]
+            upper = joint_limits[j, 1]
+            # Sample uniform random value in range
+            rand_val = torch.rand(1, device=sim.device).item()
+            joint_pos[0, j] = rand_val * (upper - lower) + lower
+        
+        # Set joint positions using write_joint_state_to_sim (more direct)
+        joint_vel = torch.zeros(1, num_joints, device=sim.device)
+        robot.write_joint_state_to_sim(joint_pos, joint_vel)
+        
+        # Step simulation multiple times to let it settle
+        for _ in range(200):  # More steps for better settling
+            scene.write_data_to_sim()
+            sim.step()
+            scene.update(sim.get_physics_dt())
+        
+        # Get EE position
+        scene.update(sim.get_physics_dt())  # Update before reading
+        ee_pos = ee_frame.data.target_pos_w[0, 0, :].cpu().numpy()
+        reachable_positions.append(ee_pos)
+        
+        if (i + 1) % 100 == 0:
+            print(f"  Sampled {i+1}/{num_samples} - Current EE: ({ee_pos[0]:.3f}, {ee_pos[1]:.3f}, {ee_pos[2]:.3f})")
+    
+    # Analyze results
+    reachable_positions = np.array(reachable_positions)
+    
+    print("\n" + "=" * 80)
+    print("REACHABLE WORKSPACE ANALYSIS:")
     print("=" * 80)
-    print("SUMMARY:")
+    print(f"X range: [{reachable_positions[:, 0].min():.3f}, {reachable_positions[:, 0].max():.3f}]")
+    print(f"Y range: [{reachable_positions[:, 1].min():.3f}, {reachable_positions[:, 1].max():.3f}]")
+    print(f"Z range: [{reachable_positions[:, 2].min():.3f}, {reachable_positions[:, 2].max():.3f}]")
     print("=" * 80)
-    print("object.data.root_pos_w shape: (num_envs, 3)")
-    print("  - Index 0: X coordinate (meters)")
-    print("  - Index 1: Y coordinate (meters)")
-    print("  - Index 2: Z coordinate / HEIGHT (meters)")
-    print("=" * 80)
+    print("\nSuggested workspace bounds for object randomization:")
+    print(f'  "x_range": ({reachable_positions[:, 0].min():.2f}, {reachable_positions[:, 0].max():.2f}),')
+    print(f'  "y_range": ({reachable_positions[:, 1].min():.2f}, {reachable_positions[:, 1].max():.2f}),')
+    print(f'  "z_range": ({reachable_positions[:, 2].min():.2f}, {reachable_positions[:, 2].max():.2f}),')
+    
+    simulation_app.close()
+    
+    return reachable_positions
 
 if __name__ == "__main__":
-    inspect_robot()
-    simulation_app.close()
+    positions = sample_reachable_positions(1000)
