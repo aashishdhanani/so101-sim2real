@@ -241,3 +241,21 @@ for rewards:
 - Lift
 
 events are for resetting the environment. randomly placing the object around for better generalization when doing inference.
+
+creating the manager rl env cfg now. just simply bringing in all the cfgs together
+
+every physics step:
+1. robot joints move
+2. objects falls
+3. collisions
+4. forces applied
+
+every environment step:
+1. Get observations (joint pos, EE pos, object pos)
+2. Policy computes action
+3. Action applied to robot
+4. Action held constant for next 4 physics steps
+5. Compute rewards
+6. Check terminations
+
+so decimation value (# of physics steps) - base default is 4?
