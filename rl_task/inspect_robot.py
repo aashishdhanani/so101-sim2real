@@ -1,4 +1,4 @@
-"""Script to inspect the structure of scene["robot"]"""
+"""Script to inspect the structure of scene["robot"] and object"""
 
 import os
 import sys
@@ -13,7 +13,7 @@ from isaaclab.scene import InteractiveScene
 from scene_cfg import Scene
 
 def inspect_robot():
-    """Inspect and print the structure of scene["robot"]"""
+    """Inspect and print the structure of scene["robot"] and object"""
     
     # Create simulation
     sim_cfg = sim_utils.SimulationCfg(device="cpu")
@@ -25,108 +25,94 @@ def inspect_robot():
     
     # Reset simulation
     sim.reset()
+    scene.update(0.0)  # Update scene to populate data
     
     # Access the robot
     robot = scene["robot"]
-    print(robot.data.joint_pos)
+    print("=" * 80)
+    print("ROBOT JOINT POSITIONS:")
+    print("=" * 80)
+    print(f"Shape: {robot.data.joint_pos.shape}")
+    print(f"Values: {robot.data.joint_pos}")
+    print()
     
-    # print("=" * 80)
-    # print("ROBOT OBJECT TYPE:")
-    # print("=" * 80)
-    # print(f"Type: {type(robot)}")
-    # print(f"Type name: {type(robot).__name__}")
-    # print()
+    # Access the object
+    print("=" * 80)
+    print("OBJECT ASSET INSPECTION:")
+    print("=" * 80)
+    object_asset = scene["object"]
+    print(f"Object type: {type(object_asset)}")
+    print(f"Object type name: {type(object_asset).__name__}")
+    print()
     
-    # print("=" * 80)
-    # print("ROBOT OBJECT ATTRIBUTES:")
-    # print("=" * 80)
-    # # Get all attributes (excluding private ones)
-    # attrs = [attr for attr in dir(robot) if not attr.startswith('_')]
-    # for attr in sorted(attrs):
-    #     try:
-    #         value = getattr(robot, attr)
-    #         if not callable(value):
-    #             print(f"  {attr}: {type(value).__name__}")
-    #     except:
-    #         pass
-    # print()
+    # Check if object has data attribute
+    if hasattr(object_asset, 'data'):
+        print("=" * 80)
+        print("OBJECT.DATA ATTRIBUTES:")
+        print("=" * 80)
+        data_attrs = [attr for attr in dir(object_asset.data) if not attr.startswith('_')]
+        for attr in sorted(data_attrs):
+            try:
+                value = getattr(object_asset.data, attr)
+                if not callable(value):
+                    if hasattr(value, 'shape'):
+                        print(f"  {attr}: shape={value.shape}, dtype={value.dtype}")
+                    elif hasattr(value, '__len__'):
+                        try:
+                            print(f"  {attr}: len={len(value)}")
+                        except:
+                            print(f"  {attr}: {type(value).__name__}")
+                    else:
+                        print(f"  {attr}: {type(value).__name__}")
+            except Exception as e:
+                print(f"  {attr}: <error accessing: {e}>")
+        print()
     
-    # print("=" * 80)
-    # print("ROBOT.DATA ATTRIBUTES (Main Data Container):")
-    # print("=" * 80)
-    # if hasattr(robot, 'data'):
-    #     data_attrs = [attr for attr in dir(robot.data) if not attr.startswith('_')]
-    #     for attr in sorted(data_attrs):
-    #         try:
-    #             value = getattr(robot.data, attr)
-    #             if not callable(value):
-    #                 if hasattr(value, 'shape'):
-    #                     print(f"  {attr}: {type(value).__name__} shape={value.shape}")
-    #                 elif hasattr(value, '__len__'):
-    #                     try:
-    #                         print(f"  {attr}: {type(value).__name__} len={len(value)}")
-    #                     except:
-    #                         print(f"  {attr}: {type(value).__name__}")
-    #                 else:
-    #                     print(f"  {attr}: {type(value).__name__}")
-    #         except Exception as e:
-    #             print(f"  {attr}: <error accessing: {e}>")
-    # print()
-    
-    # print("=" * 80)
-    # print("SAMPLE DATA VALUES:")
-    # print("=" * 80)
-    # if hasattr(robot, 'data'):
-    #     # Joint positions
-    #     if hasattr(robot.data, 'joint_pos'):
-    #         print(f"joint_pos shape: {robot.data.joint_pos.shape}")
-    #         print(f"joint_pos sample (first env, all joints): {robot.data.joint_pos[0]}")
-    #         print()
+    # Inspect root position (world position)
+    print("=" * 80)
+    print("OBJECT POSITION (root_pos_w):")
+    print("=" * 80)
+    if hasattr(object_asset, 'data') and hasattr(object_asset.data, 'root_pos_w'):
+        root_pos = object_asset.data.root_pos_w
+        print(f"Shape: {root_pos.shape}")
+        print(f"Dtype: {root_pos.dtype}")
+        print(f"Full tensor: {root_pos}")
+        print()
         
-    #     # Joint velocities
-    #     if hasattr(robot.data, 'joint_vel'):
-    #         print(f"joint_vel shape: {robot.data.joint_vel.shape}")
-    #         print(f"joint_vel sample (first env, all joints): {robot.data.joint_vel[0]}")
-    #         print()
-        
-    #     # Root position
-    #     if hasattr(robot.data, 'root_pos_w'):
-    #         print(f"root_pos_w shape: {robot.data.root_pos_w.shape}")
-    #         print(f"root_pos_w sample (first env): {robot.data.root_pos_w[0]}")
-    #         print()
-        
-    #     # Root orientation
-    #     if hasattr(robot.data, 'root_quat_w'):
-    #         print(f"root_quat_w shape: {robot.data.root_quat_w.shape}")
-    #         print(f"root_quat_w sample (first env): {robot.data.root_quat_w[0]}")
-    #         print()
+        # For single environment
+        if root_pos.shape[0] == 1:
+            pos = root_pos[0]  # First (and only) environment
+            print(f"Position for env 0: {pos}")
+            print(f"  Index 0 (X): {pos[0].item():.6f} meters")
+            print(f"  Index 1 (Y): {pos[1].item():.6f} meters")
+            print(f"  Index 2 (Z/HEIGHT): {pos[2].item():.6f} meters")
+            print()
+            print("=" * 80)
+            print("HEIGHT INFORMATION:")
+            print("=" * 80)
+            print(f"Height (Z-coordinate) is at index 2")
+            print(f"Current height: {pos[2].item():.6f} meters")
+            print(f"Expected initial height from scene_cfg: 0.055 meters")
+            print(f"Difference: {pos[2].item() - 0.055:.6f} meters")
+        else:
+            # Multiple environments
+            print(f"Multiple environments ({root_pos.shape[0]}):")
+            for env_idx in range(root_pos.shape[0]):
+                pos = root_pos[env_idx]
+                print(f"  Env {env_idx}: X={pos[0].item():.6f}, Y={pos[1].item():.6f}, Z={pos[2].item():.6f}")
+    else:
+        print("ERROR: root_pos_w not found in object.data")
+        print("Available attributes:", dir(object_asset.data) if hasattr(object_asset, 'data') else "No data attribute")
     
-    # print("=" * 80)
-    # print("ROBOT AS DICT (if applicable):")
-    # print("=" * 80)
-    # try:
-    #     robot_dict = dict(robot)
-    #     print(f"Can be converted to dict: Yes")
-    #     print(f"Dict keys: {list(robot_dict.keys())}")
-    # except:
-    #     print("Cannot be converted to dict (not a dict-like object)")
-    #     print("Access via: scene['robot'] -> Articulation object")
-    #     print("Then access data via: scene['robot'].data.joint_pos, etc.")
-    # print()
-    
-    # print("=" * 80)
-    # print("SUMMARY:")
-    # print("=" * 80)
-    # print("scene['robot'] is an Articulation object")
-    # print("Access data via: robot.data.<attribute_name>")
-    # print("Key attributes you'll likely use:")
-    # print("  - robot.data.joint_pos      (joint positions)")
-    # print("  - robot.data.joint_vel      (joint velocities)")
-    # print("  - robot.data.root_pos_w     (base position in world)")
-    # print("  - robot.data.root_quat_w    (base orientation in world)")
-    # print("=" * 80)
+    print("=" * 80)
+    print("SUMMARY:")
+    print("=" * 80)
+    print("object.data.root_pos_w shape: (num_envs, 3)")
+    print("  - Index 0: X coordinate (meters)")
+    print("  - Index 1: Y coordinate (meters)")
+    print("  - Index 2: Z coordinate / HEIGHT (meters)")
+    print("=" * 80)
 
 if __name__ == "__main__":
     inspect_robot()
     simulation_app.close()
-
