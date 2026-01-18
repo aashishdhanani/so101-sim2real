@@ -22,6 +22,7 @@ from rsl_rl.runners import OnPolicyRunner
 from agents.rsl_rl_ppo_cfg import So101PPORunnerCfg
 from manager_rl_env import So101EnvCfg
 from isaaclab.envs import ManagerBasedRLEnv
+import rl_task
 
 def main():
     # Create environment config (override num_envs if specified)
