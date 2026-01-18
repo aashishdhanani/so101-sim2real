@@ -5,7 +5,6 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Train So101 robot with PPO")
 parser.add_argument("--task", type=str, default="SO101-Lift-v0")
 parser.add_argument("--num_envs", type=int, default=1)
-parser.add_argument("--headless", action="store_true")
 parser.add_argument("--wandb-project", type=str, default="so101-lift", help="W&B project name")
 parser.add_argument("--wandb-name", type=str, default=None, help="W&B run name")
 
