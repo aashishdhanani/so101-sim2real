@@ -6,6 +6,7 @@ terminations
 resets
 '''
 
+from isaaclab.utils import configclass
 from isaaclab.envs.mdp.actions.actions_cfg import JointPositionToLimitsActionCfg
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -32,6 +33,7 @@ def object_pose(env, asset_cfg: SceneEntityCfg):
     object_pos_w = rigid_object.data.root_pos_w
     return object_pos_w
 
+@configclass
 class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         joint_positions = ObsTerm(
@@ -85,6 +87,7 @@ class ObservationsCfg:
         ),
     policy = PolicyCfg()
 
+@configclass
 class ActionsCfg:
     arm_joints = JointPositionToLimitsActionCfg(
         asset_name="robot",
@@ -156,6 +159,7 @@ def dropped(env, object_cfg: SceneEntityCfg, ee_cfg: SceneEntityCfg,
     return dropped.float()
 
 #how does weights affect? change them?
+@configclass
 class RewardsCfg:
     #1 Alive
     alive = RewTerm(func=mdp.is_alive, weight = 1.0)
@@ -191,6 +195,7 @@ class RewardsCfg:
         } 
     )
 
+@configclass
 class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     out_of_bounds = DoneTerm(
@@ -198,6 +203,7 @@ class TerminationsCfg:
         params = {"asset_cfg" : SceneEntityCfg("robot", joint_names=[".*"])}
     )
 
+@configclass
 class EventsCfg:
     # Reset robot joints
     reset_robot = EventTerm(
