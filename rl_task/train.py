@@ -43,10 +43,13 @@ def main():
     env = cast(ManagerBasedRLEnv, env)
     
     # Wrap environment for RSL-RL
-    env = RslRlVecEnvWrapper(env, clip_actions=True)
+    env = RslRlVecEnvWrapper(env, clip_actions=None)
     
     # Create agent configuration
     agent_cfg = So101PPORunnerCfg()
+    config_dict = vars(agent_cfg).copy()
+    config_dict["algorithm"] = vars(agent_cfg.algorithm)
+    config_dict["policy"] = vars(agent_cfg.policy)
     
     # Set up logging directory
     log_dir = "./logs/so101_lift"
@@ -72,10 +75,11 @@ def main():
         sync_tensorboard=True,  # Sync with tensorboard logs from RSL-RL
     )
     
+    print(agent_cfg)
     # Create PPO runner
     runner = OnPolicyRunner(
         env,
-        vars(agent_cfg),
+        config_dict,
         log_dir=log_dir,
         device=str(env.device),
     )

@@ -44,7 +44,7 @@ class ObservationsCfg:
                     joint_names = ".*"
                 )
             }
-        ),
+        )
 
         joint_velocities = ObsTerm(
             func = mdp.joint_vel_rel,
@@ -54,7 +54,7 @@ class ObservationsCfg:
                     joint_names = ".*"
                 )
             }
-        ),
+        )
 
         gripper = ObsTerm(
             func = mdp.joint_pos_rel,
@@ -62,11 +62,9 @@ class ObservationsCfg:
                 "asset_cfg" : SceneEntityCfg(
                     name = "robot",
                     joint_names = "gripper"
-                ),
-                "lower" : -0.174533,
-                "upper" : 1.74533,
+                )
             }
-        ),
+        )
 
         ee_pos = ObsTerm(
             func= ee_pos,
@@ -75,7 +73,7 @@ class ObservationsCfg:
                     name="ee_frame"
                 )
             }
-        ),
+        )
 
         object_position = ObsTerm(
             func = object_pose,
@@ -84,7 +82,7 @@ class ObservationsCfg:
                     name = "object"
                 )
             }
-        ),
+        )
     policy = PolicyCfg()
 
 @configclass
@@ -211,12 +209,8 @@ class EventsCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg(name="robot", joint_names=[".*"]),
-            "position_range" : {
-                "default" : (0.0,0.0)
-            },
-            "velocity_range" : {
-                "default" : (0.0,0.0)
-            }
+            "position_range" : (0.0,0.0),
+            "velocity_range" : (0.0,0.0)
         }
     )
     
