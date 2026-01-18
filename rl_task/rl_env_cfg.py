@@ -210,7 +210,13 @@ class EventsCfg:
         func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg(name="robot", joint_names=[".*"])
+            "asset_cfg": SceneEntityCfg(name="robot", joint_names=[".*"]),
+            "position_range" : {
+                "default" : (0.0,0.0)
+            },
+            "velocity_range" : {
+                "default" : (0.0,0.0)
+            }
         }
     )
     
