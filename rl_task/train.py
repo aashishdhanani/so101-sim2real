@@ -21,8 +21,15 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 from rsl_rl.runners import OnPolicyRunner
 from agents.rsl_rl_ppo_cfg import So101PPORunnerCfg
 from manager_rl_env import So101EnvCfg
+from gymnasium import register
 from isaaclab.envs import ManagerBasedRLEnv
-import rl_task
+from manager_rl_env import So101EnvCfg
+
+register(
+    id="SO101-Lift-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={"cfg" : So101EnvCfg()}
+)
 
 def main():
     # Create environment config (override num_envs if specified)
