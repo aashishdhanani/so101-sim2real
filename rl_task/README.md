@@ -1,256 +1,118 @@
-## Designing a RL task
+# SO101 Robot RL Task
 
-1. Enviornment type
-Each episode = one attempt to pick up the cube
-Reset the robot + cube each episode
-Terminate on success, timeout, failure
+Reinforcement learning task for training a SO101 robot arm to perform reach-grasp-lift manipulation.
 
-2. Stages
-- Reach cube, grasp cube, and lift cube
+## Overview
 
-3. Action space
-Joint position deltas vs end-efector deltas?
+This task implements a PPO-based RL environment where the SO101 robot learns to:
+1. **Reach** - Move end-effector toward the object
+2. **Grasp** - Close gripper at the right time and position
+3. **Lift** - Raise the object above a threshold height
 
-4. Observation Space
-I want the smallest set of information that makes the task solvabe
-- Joint positions
-- Joint velocities
-- End-effector pose?
-- Cube post relative to end effector
-- Gripper state
+## Task Structure
 
-5. Reward Design
-- Reach
-- Grasp + bonus if the gripper closes and the cube is between the fingers
-- Lift
+### Environment
+- **Type**: Manager-based RL environment (Isaac Lab)
+- **Episode**: One attempt to pick up and lift the cube
+- **Reset**: Robot joints and object position reset each episode
+- **Termination**: Success (object lifted), timeout, or failure (object dropped, out of bounds)
 
-6. Termination conditions
-- Cube lifted above height threshold
-- robot outside its joint boundaries
-- Timeout
-- cube falls out
+### Action Space
+- **Arm joints** (5 DOF): Joint position targets with automatic limit enforcement
+- **Gripper**: Open/close control
+- **Action type**: Joint position targets (absolute positions)
 
-7. Algorithm choice
-- Been reading and seeing that PPO is a base algorithm that I can learn and use
+### Observation Space
+Minimal observation set for task solvability:
+1. **Joint positions and velocities** - Robot state
+2. **End-effector position** - Gripper location in world frame
+3. **Object position** - Target object location
+4. **Gripper state** - Open/close status
 
-### What is PPO (Proximal Policy Optimization)?
-You have an agent that
-- looks at a state s
-- chooses an action a
-- recieves a reward r
-- repeats
+### Reward Design
+- **Alive**: Small positive reward for staying active
+- **Terminated**: Penalty for early termination
+- **Grasped**: Reward when object is close to EE and gripper is closed
+- **Object height**: Reward for lifting object higher
+- **Object dropped**: Penalty if object falls below end-effector
 
-Imagine teaching someone to bowl: if you change their style a tiny bit, results usually improve, but if you change a lot in one day, they might get worse 
+### Termination Conditions
+- **Timeout**: Episode length exceeded (20 seconds)
+- **Out of bounds**: Robot joints exceed limits
 
-So PPO says to try the current style, figure out which moves were better than expected, update the style to do more of those moves, but put it on a leash so it is not too drastic of changes. This leash is called clipping
+## File Structure
 
-Core RL math:
-1. Return (How good was this situation?)
-2. Value function (expected return from a state) - meaning if I'm in a state s and follow policy, what score do i expect on average
-3. Q function (expected return if I take action a first)
-4. Advantage (was this action better than normal?)
-5. PPO is a policy gradient method which says to increase expected "goodness", push parameters in the direction that increases policy for good actions
-6. PPO collects data using an old policy, but wants to update a new policy, so ration is new/old. If ratio = 1, new policy gives same probability as old policy, >1 means new policy makes that action more likely, and <1 means that new policy makes action less likely
-6.1 - PPO modifies the objective to prevent this ratio value from drifting too far away from 1 so here is where clipping comes in. You have some small epsilon value and have 2 cases
-6.1.1 - Advantage > 0 (action was good) -> We want to increase its probability meaning ratio > 1, but PPO says increase it but not by too much, so if ratio goes above 1 + epsilon, clipping replaces with 1 + epsilon. 
-6.1.2 - Advantage < 0 (action is bad) -> decrease but not by much. So if ratio goes < 1 - epsilon, replaced with 1-epsilon
+```
+rl_task/
+├── __init__.py              # Environment registration
+├── scene_cfg.py             # Scene configuration (robot, object, table, etc.)
+├── rl_env_cfg.py            # RL environment config (observations, actions, rewards, terminations, events)
+├── manager_rl_env.py        # Main environment configuration class
+├── train.py                 # Training script
+├── agents/
+│   ├── rsl_rl_ppo_cfg.py   # PPO agent configuration
+│   └── README.md           # Detailed PPO explanation
+└── TRAINING_EXPLANATION.md # Training structure and expectations
+```
 
-PPO is actor critic so you train 2 networks
-1. Actor (policy network) - outputs the policy
-2. Critic (value network) - outputs the value 
+## Configuration Components
 
-Why both? Actor decides what to do and critic estimates how good the states are so we can compute advantage
+### Scene Configuration (`scene_cfg.py`)
+Defines the simulation scene:
+- **Robot**: SO101 arm with URDF-based configuration
+- **End-effector frame**: Frame transformer sensor tracking gripper pose
+- **Object**: Rigid object (cube) to be manipulated
+- **Table**: Work surface for object placement
+- **Ground plane**: Floor of the scene
+- **Lighting**: Scene illumination
 
-How does PPO compute advantage?
-1. TD error - reward + value of future discounted - value of now
-2. Generalized advantage estimation - have a bias lambda value where when = 0, there low variance and more bias and close to 1 means less bias and more variance
+### RL Environment Configuration (`rl_env_cfg.py`)
+- **Observations**: Joint states, EE position, object position
+- **Actions**: Joint position control with limits
+- **Rewards**: Grasping, lifting, alive bonuses
+- **Terminations**: Timeout, out of bounds
+- **Events**: Randomization of object position on reset
 
-Algorithm step by step:
-1. Initialize policy params and value params
-2. Repeat for iterations
-    set old policy <-- policy 
-    collect rollouts: run policy in env for T steps (parallel envs too)
-    compute
-        - Value
-        - TD error
-        - advantages
-        - returns R
-    for K epochs
-        shuffle rollout data into minibatches
-        for each minibatch
-            compute ratio
-            compute clipped surrogate?
-            compute value loss L
-            compute entropy bonus
-            take gradient step
-3. DONE
+### Manager RL Environment (`manager_rl_env.py`)
+Aggregates all configurations into the main environment class:
+- Combines scene, observations, actions, rewards, terminations, events
+- Sets decimation (4 physics steps per environment step)
+- Sets episode length (20 seconds)
 
-8. Analysis and Evaluation
+## Training
 
-Configuration for a manipulation scene with a robot, object, table, and environment elements.
+### Quick Start
 
-## Components
+```bash
+# Train with visualization (1 environment)
+python rl_task/train.py --num_envs 1
 
-### `robot: ArticulationCfg`
-The robot arm in the scene.
-- **Type**: Articulation (multi-joint robot)
-- **Purpose**: The manipulator that performs the task
-- **Example**: SO101 arm, Franka Panda, etc.
-- **Must be set**: Yes (defined in agent-specific config)
+# Train headless (faster)
+python rl_task/train.py --num_envs 1 --headless
 
-### `ee_frame: FrameTransformerCfg`
-Sensor that tracks the end-effector (gripper) position and orientation.
-- **Type**: Frame Transformer Sensor
-- **Purpose**: Tracks where the gripper is relative to the robot base
-- **Used for**: Computing rewards (distance to object), observations
-- **Key info**: 
-  - Source frame: Robot base link (e.g., `base_link`)
-  - Target frame: End-effector link (e.g., `gripper_link` or `gripper_frame_link`)
-  - TCP offset: Position offset from link origin to tool center point
-- **Must be set**: Yes (defined in agent-specific config)
+# With custom WandB project
+python rl_task/train.py --num_envs 1 --wandb-project "my-experiment"
+```
 
-### `object: RigidObjectCfg | DeformableObjectCfg`
-The object being manipulated (e.g., cube, box).
-- **Type**: Rigid or Deformable Object
-- **Purpose**: The item the robot picks up/manipulates
-- **Used for**: 
-  - Rewards (reaching, lifting, goal tracking)
-  - Observations (object position)
-  - Events (resetting object position)
-  - Terminations (object dropping)
-- **Must be set**: Yes (defined in agent-specific config)
+### Training Configuration
+- **Algorithm**: PPO (Proximal Policy Optimization)
+- **Max iterations**: 1500
+- **Steps per env per iteration**: 24
+- **Learning epochs per iteration**: 5
+- **Mini-batches per epoch**: 4
+- **Episode length**: 20 seconds
 
-### `table: AssetBaseCfg`
-The table/work surface in the scene.
-- **Type**: Static Asset
-- **Purpose**: Surface where objects are placed
-- **Spawn**: USD file from Isaac Nucleus (`SeattleLabTable`)
-- **Position**: `(0.5, 0, 0)` with rotation `(0.707, 0, 0, 0.707)`
-- **Inherited**: Yes (already defined in base class)
+See `TRAINING_EXPLANATION.md` for detailed training structure.
 
-### `plane: AssetBaseCfg`
-The ground plane.
-- **Type**: Static Asset
-- **Purpose**: Floor/ground of the scene
-- **Spawn**: Built-in ground plane
-- **Position**: `(0, 0, -1.05)` (1.05m below origin)
-- **Inherited**: Yes (already defined in base class)
+## Environment Step Flow
 
-### `light: AssetBaseCfg`
-Scene lighting.
-- **Type**: Light Asset
-- **Purpose**: Illuminates the scene
-- **Spawn**: Dome light with color `(0.75, 0.75, 0.75)` and intensity `3000.0`
-- **Inherited**: Yes (already defined in base class)
+### Physics Step (every simulation timestep):
+1. Robot joints move
+2. Objects fall/respond to physics
+3. Collisions detected
+4. Forces applied
 
-
-## Designing the RL ENV - observations class. observation class is what the agent needs to have in order to make desicisons about its environment
-initially, i thought that this is all i needed:
-
-- all joint positions and velocities
-- End effector position
-- object position
-
-now, since this is a reach grasp lift, we have
-REACH - move EE towards object
-- where is the object?
-- where is the EE
-- join pos/velocities
-- i think have (object - EE) relative position is fine initially
-
-GRASP - Close gripper at the right time
-- is the EE close enough?
-- is the EE aligned?
-- 
-
-LIFT - lift the object
-- is the object grasped?
-- how high is it?
-- need to know if gripper is closed
-
-INITIAL OBSERVATION STATE:
-    minimal observation needed:
-    1. robot joint positions + velocities
-    2. EE position + object position 
-    3. gripper open/close state
-
-how am i getting the robot data? 
-scene['robot'] is Articulation object (meaning that its a state of being connected via joints)
-access data via: scene['robot'].data.joint_pos etc...
-
-
-ACTION SPACE - define all possible moves the robot can make
-joints 1 - 5 for moving the body
-joints 6 for opening and closing the gripper
-
-delta vs absolute positions:
-- delta: displacement from last relative positon
-- absolute: fixed static position
-
-----------restart
-isaaclab has a manager class that has built in rl envs to help
-
-Observation Manager class:
-1. ObservationTerm: function with return (num_envs, D)
-manager will figure out when to call it, figures out which robot, 
-
-SceneEntityCfg: 
-
-SceneEntityCfg(
-    name="so101",
-    joint_names=["joint1", "joint2", "joint3", "joint4", "joint5"]
-)
-
-observation manager will resolve names to indices
-
-ObservationTermCfg:
-
-ObservationTermCfg(
-    func=joint_pos,
-    params={
-        "asset_cfg": SceneEntityCfg(
-            name="so101",
-            joint_names=".*"   # regex allowed
-        )
-    },
-    scale=1.0,
-    clip=(-1.0, 1.0),
-    history_length=0
-)
-
-changed observation class to config class to use ObsTerm and ObsGroup
-
-How does observation manager fit in overall flow:
-- define observationscfg - what you are creating
-- manaagerbasedenv creates observationsmanager from my config
-- each step, manager calls observation functions
-- computed observations are passed to RL policy
-
-
-"create all the environment configs so that manager based RL env can use when PPO training"
-
-for actions:
-you have the actionsTermCfg for the configuration for each action term
-there are a couple of joing position actions, need to figure out which are the best for my use case right now
-
-found the jointpositiontolimitsactioncfg class that has an auto limit enforcement so that joints don't go out of bounds
-
-for rewards:
-- Reach
-- Grasp + bonus if the gripper closes and the cube is between the fingers
-- Lift
-
-events are for resetting the environment. randomly placing the object around for better generalization when doing inference.
-
-creating the manager rl env cfg now. just simply bringing in all the cfgs together
-
-every physics step:
-1. robot joints move
-2. objects falls
-3. collisions
-4. forces applied
-
-every environment step:
+### Environment Step (every 4 physics steps, decimation=4):
 1. Get observations (joint pos, EE pos, object pos)
 2. Policy computes action
 3. Action applied to robot
@@ -258,4 +120,36 @@ every environment step:
 5. Compute rewards
 6. Check terminations
 
-so decimation value (# of physics steps) - base default is 4?
+## Key Implementation Details
+
+### Observation Manager
+- Uses `ObservationTermCfg` for each observation component
+- Groups observations into "policy" group for actor/critic
+- Automatically handles batching across parallel environments
+
+### Action Manager
+- Uses `JointPositionToLimitsActionCfg` for automatic joint limit enforcement
+- Separate control for arm joints and gripper
+
+### Reward Manager
+- Custom reward functions for task-specific behaviors
+- Weighted reward terms for balancing different objectives
+
+### Event Manager
+- Randomizes object position on reset for better generalization
+- Resets robot joints to default positions
+
+## Monitoring
+
+Training metrics are logged to:
+- **WandB**: Real-time dashboard (rewards, losses, episode lengths)
+- **TensorBoard**: Synced with WandB via RSL-RL
+- **Console**: Progress updates and checkpoints
+
+Checkpoints are saved every 50 iterations to `./logs/so101_lift/`
+
+## References
+
+- **PPO Algorithm**: See `agents/README.md` for detailed explanation
+- **Training Structure**: See `TRAINING_EXPLANATION.md` for iteration/epoch breakdown
+- **Isaac Lab Docs**: [Isaac Lab Documentation](https://isaac-sim.github.io/IsaacLab/)

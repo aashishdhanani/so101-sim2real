@@ -10,3 +10,50 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Training outputs
+logs/
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.h5
+*.hdf5
+
+# WandB
+wandb/
+.wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Isaac Sim cache (if any)
+.nucleus_cache/
+*.usd
+*.usda
+*.usdc
+# Keep robot assets but ignore generated USD files if they're large
+# Uncomment if you generate USD files during training:
+# robot/*.usd
+
+# Temporary files
+*.tmp
+*.log
+*.out
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Environment variables
+.env
+.env.local

@@ -9,11 +9,13 @@
   "venvPath": ".",
   "venv": ".venv",
   "extraPaths": [
-    ".venv/lib/python3.11/site-packages/isaaclab/source/isaaclab"
+    "/home/adhanani/Desktop/so101-sim2real/.venv/lib/python3.11/site-packages/isaaclab/source/isaaclab",
+    "/home/adhanani/Desktop/so101-sim2real/.venv/lib/python3.11/site-packages/isaaclab/source/isaaclab_rl",
+    "/home/adhanani/Desktop/so101-sim2real/.venv/lib/python3.11/site-packages/isaaclab/source",
+    "/home/adhanani/Desktop/so101-sim2real/.venv/lib/python3.11/site-packages"
   ],
   "pythonVersion": "3.11",
   "typeCheckingMode": "basic",
   "reportMissingImports": true,
   "reportMissingTypeStubs": false
 }
-
