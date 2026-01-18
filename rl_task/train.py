@@ -1,6 +1,6 @@
 import argparse
 from isaaclab.app import AppLauncher
-from isaaclab.envs import ManagerBasedRLEnv
+
 
 parser = argparse.ArgumentParser(description="Train So101 robot with PPO")
 parser.add_argument("--task", type=str, default="SO101-Lift-v0")
@@ -22,6 +22,7 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 from rsl_rl.runners import OnPolicyRunner
 from agents.rsl_rl_ppo_cfg import So101PPORunnerCfg
 from manager_rl_env import So101EnvCfg
+from isaaclab.envs import ManagerBasedRLEnv
 
 def main():
     # Create environment config (override num_envs if specified)
