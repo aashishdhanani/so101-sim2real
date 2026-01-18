@@ -12,7 +12,7 @@ class So101EnvCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     rewards: RewardsCfg = RewardsCfg()
-    events = EventsCfg = EventsCfg()
+    events:  EventsCfg = EventsCfg()
 
     decimation = 4
     episode_length_s = 20.0

@@ -33,7 +33,7 @@ register(
 
 def main():
     # Create environment config (override num_envs if specified)
-    env_cfg = None
+    env_cfg = So101EnvCfg()
     if args_cli.num_envs is not None:
         env_cfg = So101EnvCfg()
         env_cfg.scene.num_envs = args_cli.num_envs
