@@ -51,9 +51,9 @@ class SceneCfg(InteractiveSceneCfg):
             "all_joints": IdealPDActuatorCfg(
                 joint_names_expr=[".*"],
                 stiffness=40.0,
-                damping=4.0,
+                damping=8.0,
                 effort_limit=1.5,
-                velocity_limit=2.0,
+                velocity_limit=1.0,
                 armature=0.01,
             )
         },

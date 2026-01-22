@@ -33,6 +33,16 @@ def object_pose(env, asset_cfg: SceneEntityCfg):
     object_pos_w = rigid_object.data.root_pos_w
     return object_pos_w
 
+def ee_to_object_relative(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg):
+    ee_frame = env.scene[ee_cfg.name]
+    object_asset = env.scene[object_cfg.name]
+    
+    ee_pos = ee_frame.data.target_pos_w[:, 0, :]
+    obj_pos = object_asset.data.root_pos_w
+    
+    relative_pos = ee_pos - obj_pos
+    return relative_pos
+
 @configclass
 class ObservationsCfg:
     class PolicyCfg(ObsGroup):
@@ -81,6 +91,14 @@ class ObservationsCfg:
                 "asset_cfg": SceneEntityCfg(
                     name = "object"
                 )
+            }
+        )
+
+        ee_to_object = ObsTerm(  # NEW
+            func=ee_to_object_relative,
+            params={
+                "ee_cfg": SceneEntityCfg("ee_frame"),
+                "object_cfg": SceneEntityCfg("object"),
             }
         )
     policy = PolicyCfg()
@@ -154,7 +172,7 @@ def dropped(env, object_cfg: SceneEntityCfg, ee_cfg: SceneEntityCfg,
     
     return dropped.float()
 
-def distance_to_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg):
+def distance_to_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg, scale: float = 0.1):
     ee_frame = env.scene[ee_cfg.name]
     object_asset = env.scene[object_cfg.name]
     
@@ -162,7 +180,34 @@ def distance_to_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg):
     obj_pos = object_asset.data.root_pos_w
     
     distance = torch.norm(ee_pos - obj_pos, dim=-1)
-    return -distance
+    return torch.exp(-distance / scale)
+
+def joint_movement_penalty(env, robot_cfg: SceneEntityCfg, base_joint_weight: float = 2.0):
+    robot = env.scene[robot_cfg.name]
+    joint_vel = robot.data.joint_vel
+    
+    base_joint_idx = robot.joint_names.index("shoulder_pan")
+    base_vel = torch.abs(joint_vel[:, base_joint_idx])
+    
+    other_joint_vel = torch.abs(joint_vel[:, [i for i in range(robot.num_joints) if i != base_joint_idx]])
+    other_vel_norm = torch.norm(other_joint_vel, dim=-1)
+    
+    penalty = base_vel * base_joint_weight + other_vel_norm
+    return -penalty
+
+
+
+def self_collision_penalty(env, robot_cfg: SceneEntityCfg, ee_cfg: SceneEntityCfg, min_distance: float = 0.15):
+    robot = env.scene[robot_cfg.name]
+    ee_frame = env.scene[ee_cfg.name]
+    
+    base_pos = robot.data.root_pos_w
+    ee_pos = ee_frame.data.target_pos_w[:, 0, :]
+    
+    distance_to_base = torch.norm(ee_pos - base_pos, dim=-1)
+    too_close = distance_to_base < min_distance
+    
+    return -too_close.float()
 
 def touches_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg, 
                    touch_threshold: float = 0.03):
@@ -190,21 +235,41 @@ def object_out_of_range(env, object_cfg: SceneEntityCfg,
 #how does weights affect? change them?
 @configclass
 class RewardsCfg:
-    alive = RewTerm(func=mdp.is_alive, weight=1.0)
+    alive = RewTerm(func=mdp.is_alive, weight=0.5)  # Reduced from 1.0
     terminated = RewTerm(func=mdp.is_terminated, weight=-2.0)
     
     approach_object = RewTerm(
-        func=distance_to_object,
-        weight=2.0,
+        func=distance_to_object,  # Use exponential version
+        weight=5.0,  # Increased from 2.0
         params={
             "ee_cfg": SceneEntityCfg("ee_frame"),
             "object_cfg": SceneEntityCfg("object"),
+            "scale": 0.1,
+        }
+    )
+    
+    joint_movement = RewTerm(
+        func=joint_movement_penalty,
+        weight=-0.1,  # Small penalty for movement
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+            "base_joint_weight": 2.0,  # Penalize base more
+        }
+    )
+    
+    self_collision = RewTerm(
+        func=self_collision_penalty,
+        weight=-2.0,
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+            "ee_cfg": SceneEntityCfg("ee_frame"),
+            "min_distance": 0.15,
         }
     )
     
     touches_object = RewTerm(
         func=touches_object,
-        weight=3.0,
+        weight=5.0,  # Increased from 3.0
         params={
             "ee_cfg": SceneEntityCfg("ee_frame"),
             "object_cfg": SceneEntityCfg("object"),
@@ -214,7 +279,7 @@ class RewardsCfg:
     
     grasped = RewTerm(
         func=is_grasped, 
-        weight=10.0,
+        weight=15.0,  # Increased from 10.0
         params={
             "robot_cfg": SceneEntityCfg("robot", joint_names=["gripper"]), 
             "object_cfg": SceneEntityCfg("object"), 
