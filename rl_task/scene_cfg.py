@@ -34,6 +34,18 @@ class SceneCfg(InteractiveSceneCfg):
 
     robot = ArticulationCfg(
         prim_path="{ENV_REGEX_NS}/So101",
+        init_state=ArticulationCfg.InitialStateCfg(
+            rot=(1.0, 0.0, 0.0, 0.0),
+            joint_pos={
+                "shoulder_pan": 0.0,
+                "shoulder_lift": 0.0,
+                "elbow_flex": -0.0,
+                "wrist_flex": 1.57, 
+                "wrist_roll": -0.0,
+                "gripper": 0.0,
+            },
+            joint_vel={".*": 0.0},
+        ),
         spawn=sim_utils.UsdFileCfg(
             usd_path=usd_path,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
@@ -48,14 +60,32 @@ class SceneCfg(InteractiveSceneCfg):
         ),
 
         actuators={
-            "all_joints": IdealPDActuatorCfg(
-                joint_names_expr=[".*"],
-                stiffness=40.0,
-                damping=8.0,
-                effort_limit=1.5,
-                velocity_limit=0.5,
-                armature=0.01,
-            )
+            "arm": ImplicitActuatorCfg(
+                joint_names_expr=["shoulder_.*", "elbow_flex", "wrist_.*"],
+                effort_limit_sim=1.9,
+                velocity_limit_sim=1.5,  
+                stiffness={
+                    "shoulder_pan": 200.0,  
+                    "shoulder_lift": 170.0,
+                    "elbow_flex": 120.0,    
+                    "wrist_flex": 80.0,      
+                    "wrist_roll": 50.0,  
+                },
+                damping={
+                    "shoulder_pan": 80.0,
+                    "shoulder_lift": 65.0,
+                    "elbow_flex": 45.0,
+                    "wrist_flex": 30.0,
+                    "wrist_roll": 20.0,
+                },
+            ),
+            "gripper": ImplicitActuatorCfg(
+                joint_names_expr=["gripper"],
+                effort_limit_sim=2.5,  
+                velocity_limit_sim=1.5,
+                stiffness=60.0, 
+                damping=20.0,  
+            ),
         },
     )
 
@@ -65,9 +95,9 @@ class SceneCfg(InteractiveSceneCfg):
         target_frames=[
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/So101/gripper_link",
-                name="ee_tcp",
+                name="end_effector",
                 offset=OffsetCfg(
-                    pos=(-0.0079, -0.000218121, -0.0981274),  # TCP offset from gripper_link to gripper_frame_link
+                    pos=(0.01, 0.0, -0.09),  
                 ),
             ),
         ],
@@ -75,10 +105,10 @@ class SceneCfg(InteractiveSceneCfg):
 
     object = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.22, 0, 0.035), rot=(1, 0, 0, 0)),  # Center of reachable workspace
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2, 0, 0.015), rot=(1, 0, 0, 0)),  
         spawn=UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-            scale=(0.8, 0.8, 0.8),
+            scale=(0.5, 0.5, 0.5),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=16,
                 solver_velocity_iteration_count=1,
