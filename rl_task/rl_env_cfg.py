@@ -382,7 +382,7 @@ class RewardsCfg:
     lifting_object = RewTerm(
         func=object_is_lifted, 
         params={"minimal_height": 0.025, "object_cfg": SceneEntityCfg("object")}, 
-        weight=15.0
+        weight=25.0
     )
     
     object_goal_tracking = RewTerm(
@@ -394,7 +394,7 @@ class RewardsCfg:
             "robot_cfg": SceneEntityCfg("robot"),
             "object_cfg": SceneEntityCfg("object")
         },
-        weight=16.0,
+        weight=30.0,
     )
     
     object_goal_tracking_fine_grained = RewTerm(
