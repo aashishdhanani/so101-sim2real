@@ -144,53 +144,101 @@ def dropped(env, object_cfg: SceneEntityCfg, ee_cfg: SceneEntityCfg,
     object_asset = env.scene[object_cfg.name]
     ee_frame = env.scene[ee_cfg.name]
     
-    # Get heights (z-coordinates)
     ee_pos = ee_frame.data.target_pos_w[:, 0, :]  
     ee_height = ee_pos[:, 2] 
     
     obj_pos = object_asset.data.root_pos_w  
     obj_height = obj_pos[:, 2] 
     
-    # Object is dropped if it's below the EE (with some margin)
     dropped = obj_height < (ee_height - height_margin)
     
     return dropped.float()
 
+def distance_to_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg):
+    ee_frame = env.scene[ee_cfg.name]
+    object_asset = env.scene[object_cfg.name]
+    
+    ee_pos = ee_frame.data.target_pos_w[:, 0, :]
+    obj_pos = object_asset.data.root_pos_w
+    
+    distance = torch.norm(ee_pos - obj_pos, dim=-1)
+    return -distance
+
+def touches_object(env, ee_cfg: SceneEntityCfg, object_cfg: SceneEntityCfg, 
+                   touch_threshold: float = 0.03):
+    ee_frame = env.scene[ee_cfg.name]
+    object_asset = env.scene[object_cfg.name]
+    
+    ee_pos = ee_frame.data.target_pos_w[:, 0, :]
+    obj_pos = object_asset.data.root_pos_w
+    
+    distance = torch.norm(ee_pos - obj_pos, dim=-1)
+    is_touching = distance < touch_threshold
+    
+    return is_touching.float()
+
+def object_out_of_range(env, object_cfg: SceneEntityCfg, 
+                        max_distance: float = 0.5):
+    object_asset = env.scene[object_cfg.name]
+    obj_pos = object_asset.data.root_pos_w
+    
+    distance = torch.norm(obj_pos, dim=-1)
+    out_of_range = distance > max_distance
+    
+    return out_of_range.bool()
+
 #how does weights affect? change them?
 @configclass
 class RewardsCfg:
-    #1 Alive
-    alive = RewTerm(func=mdp.is_alive, weight = 1.0)
-    terminated = RewTerm(func=mdp.is_terminated, weight = -2.0)
-    #is_grasped
+    alive = RewTerm(func=mdp.is_alive, weight=1.0)
+    terminated = RewTerm(func=mdp.is_terminated, weight=-2.0)
+    
+    approach_object = RewTerm(
+        func=distance_to_object,
+        weight=2.0,
+        params={
+            "ee_cfg": SceneEntityCfg("ee_frame"),
+            "object_cfg": SceneEntityCfg("object"),
+        }
+    )
+    
+    touches_object = RewTerm(
+        func=touches_object,
+        weight=3.0,
+        params={
+            "ee_cfg": SceneEntityCfg("ee_frame"),
+            "object_cfg": SceneEntityCfg("object"),
+            "touch_threshold": 0.03,
+        }
+    )
+    
     grasped = RewTerm(
         func=is_grasped, 
-        weight=5.0,
-        params = {
+        weight=10.0,
+        params={
             "robot_cfg": SceneEntityCfg("robot", joint_names=["gripper"]), 
-            "object_cfg" : SceneEntityCfg("object"), 
-            "ee_cfg" : SceneEntityCfg("ee_frame"),
+            "object_cfg": SceneEntityCfg("object"), 
+            "ee_cfg": SceneEntityCfg("ee_frame"),
             "distance_threshold": 0.05,
             "gripper_closed_threshold": 0.8
-        }    
-        
+        }
     )
-    #object_height
+    
     object_height = RewTerm(
         func=height, 
         weight=5.0,
-        params= {
-            "object_cfg" : SceneEntityCfg("object"),
-        }    
+        params={
+            "object_cfg": SceneEntityCfg("object"),
+        }
     )
-    #object_dropped
+    
     object_dropped = RewTerm(
         func=dropped, 
         weight=-5.0,
-        params = {
-            "object_cfg" : SceneEntityCfg("object"), 
-            "ee_cfg" : SceneEntityCfg("ee_frame")
-        } 
+        params={
+            "object_cfg": SceneEntityCfg("object"), 
+            "ee_cfg": SceneEntityCfg("ee_frame")
+        }
     )
 
 @configclass
@@ -198,7 +246,14 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     out_of_bounds = DoneTerm(
         func=mdp.joint_pos_out_of_limit,
-        params = {"asset_cfg" : SceneEntityCfg("robot", joint_names=[".*"])}
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])}
+    )
+    object_out_of_range = DoneTerm(
+        func=object_out_of_range,
+        params={
+            "object_cfg": SceneEntityCfg("object"),
+            "max_distance": 0.5,
+        }
     )
 
 @configclass
@@ -221,9 +276,9 @@ class EventsCfg:
         params={
             "asset_cfg": SceneEntityCfg(name="object"),
             "pose_range": {
-                "x": (-0.2, 0.2), 
-                "y": (-0.2, 0.2),  
-                "z": (-0.005, 0.045)  
+                "x": (0.15, 0.30),   # Forward reach (conservative, 80% of max ~0.39m)
+                "y": (-0.15, 0.15),  # Side-to-side
+                "z": (0.02, 0.05)    # Height above table
             },
             "velocity_range": {
                 "x": (0.0, 0.0),

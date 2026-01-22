@@ -4,7 +4,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg, DeformableObjectCfg, 
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim.converters import UrdfConverter, UrdfConverterCfg
-from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.actuators import IdealPDActuatorCfg, ImplicitActuatorCfg
 import isaaclab.sim as sim_utils
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
@@ -46,11 +46,15 @@ class SceneCfg(InteractiveSceneCfg):
                 solver_velocity_iteration_count=0
             ),
         ),
+
         actuators={
-            "all_joints": ImplicitActuatorCfg(
-                joint_names_expr=[".*"], 
-                stiffness=None,  
-                damping=None,  
+            "all_joints": IdealPDActuatorCfg(
+                joint_names_expr=[".*"],
+                stiffness=40.0,
+                damping=4.0,
+                effort_limit=1.5,
+                velocity_limit=2.0,
+                armature=0.01,
             )
         },
     )
@@ -71,7 +75,7 @@ class SceneCfg(InteractiveSceneCfg):
 
     object = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, 0, 0.055), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.22, 0, 0.035), rot=(1, 0, 0, 0)),  # Center of reachable workspace
         spawn=UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
             scale=(0.8, 0.8, 0.8),

@@ -50,7 +50,7 @@ class So101PPORunnerCfg(RslRlOnPolicyRunnerCfg):
         activation="elu",                   
         actor_obs_normalization=False,      
         critic_obs_normalization=False,     
-        init_noise_std=1.0,   
+        init_noise_std=1.5,   
     )
 
     algorithm = RslRlPpoAlgorithmCfg(
