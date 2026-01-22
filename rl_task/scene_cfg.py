@@ -53,7 +53,7 @@ class SceneCfg(InteractiveSceneCfg):
                 stiffness=40.0,
                 damping=8.0,
                 effort_limit=1.5,
-                velocity_limit=1.0,
+                velocity_limit=0.5,
                 armature=0.01,
             )
         },

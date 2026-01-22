@@ -94,7 +94,7 @@ class ObservationsCfg:
             }
         )
 
-        ee_to_object = ObsTerm(  # NEW
+        ee_to_object = ObsTerm(
             func=ee_to_object_relative,
             params={
                 "ee_cfg": SceneEntityCfg("ee_frame"),
@@ -189,11 +189,21 @@ def joint_movement_penalty(env, robot_cfg: SceneEntityCfg, base_joint_weight: fl
     base_joint_idx = robot.joint_names.index("shoulder_pan")
     base_vel = torch.abs(joint_vel[:, base_joint_idx])
     
-    other_joint_vel = torch.abs(joint_vel[:, [i for i in range(robot.num_joints) if i != base_joint_idx]])
+    other_indices = [i for i in range(robot.num_joints) if i != base_joint_idx]
+    other_joint_vel = torch.abs(joint_vel[:, other_indices])
     other_vel_norm = torch.norm(other_joint_vel, dim=-1)
     
     penalty = base_vel * base_joint_weight + other_vel_norm
     return -penalty
+
+def base_joint_position_penalty(env, robot_cfg: SceneEntityCfg, max_deviation: float = 1.0):
+    robot = env.scene[robot_cfg.name]
+    base_joint_idx = robot.joint_names.index("shoulder_pan")
+    base_joint_pos = robot.data.joint_pos[:, base_joint_idx]
+    
+    deviation = torch.abs(base_joint_pos)
+    normalized_deviation = torch.clamp(deviation / max_deviation, 0.0, 1.0)
+    return -normalized_deviation ** 2
 
 
 
@@ -232,15 +242,14 @@ def object_out_of_range(env, object_cfg: SceneEntityCfg,
     
     return out_of_range.bool()
 
-#how does weights affect? change them?
 @configclass
 class RewardsCfg:
-    alive = RewTerm(func=mdp.is_alive, weight=0.5)  # Reduced from 1.0
+    alive = RewTerm(func=mdp.is_alive, weight=0.5)
     terminated = RewTerm(func=mdp.is_terminated, weight=-2.0)
     
     approach_object = RewTerm(
-        func=distance_to_object,  # Use exponential version
-        weight=5.0,  # Increased from 2.0
+        func=distance_to_object,
+        weight=5.0,
         params={
             "ee_cfg": SceneEntityCfg("ee_frame"),
             "object_cfg": SceneEntityCfg("object"),
@@ -250,26 +259,35 @@ class RewardsCfg:
     
     joint_movement = RewTerm(
         func=joint_movement_penalty,
-        weight=-0.1,  # Small penalty for movement
+        weight=-0.5,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
-            "base_joint_weight": 2.0,  # Penalize base more
+            "base_joint_weight": 3.0,
+        }
+    )
+    
+    base_joint_position = RewTerm(
+        func=base_joint_position_penalty,
+        weight=-1.0,
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+            "max_deviation": 1.0,
         }
     )
     
     self_collision = RewTerm(
         func=self_collision_penalty,
-        weight=-2.0,
+        weight=-3.0,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "ee_cfg": SceneEntityCfg("ee_frame"),
-            "min_distance": 0.15,
+            "min_distance": 0.12,
         }
     )
     
     touches_object = RewTerm(
         func=touches_object,
-        weight=5.0,  # Increased from 3.0
+        weight=5.0,
         params={
             "ee_cfg": SceneEntityCfg("ee_frame"),
             "object_cfg": SceneEntityCfg("object"),
@@ -279,7 +297,7 @@ class RewardsCfg:
     
     grasped = RewTerm(
         func=is_grasped, 
-        weight=15.0,  # Increased from 10.0
+        weight=15.0,
         params={
             "robot_cfg": SceneEntityCfg("robot", joint_names=["gripper"]), 
             "object_cfg": SceneEntityCfg("object"), 
