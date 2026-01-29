@@ -81,9 +81,9 @@ class SceneCfg(InteractiveSceneCfg):
             ),
             "gripper": ImplicitActuatorCfg(
                 joint_names_expr=["gripper"],
-                effort_limit_sim=3.5,  
+                effort_limit_sim=4.0,  
                 velocity_limit_sim=1.5,
-                stiffness=100.0, 
+                stiffness=120.0, 
                 damping=30.0,  
             ),
         },

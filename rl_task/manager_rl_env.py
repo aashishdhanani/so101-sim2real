@@ -12,8 +12,9 @@ class So101EnvCfg(ManagerBasedRLEnvCfg):
 
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
-    commands: CommandsCfg = CommandsCfg()  # ADD THIS LINE
+    commands: CommandsCfg = CommandsCfg() 
     terminations: TerminationsCfg = TerminationsCfg()
+    # curriculum: CurriculumCfg = CurriculumCfg()
     rewards: RewardsCfg = RewardsCfg()
     events:  EventsCfg = EventsCfg()
 
@@ -21,7 +22,7 @@ class So101EnvCfg(ManagerBasedRLEnvCfg):
     episode_length_s: float = 5.0
 
     def __post_init__(self):
-        # Physics settings for better contact/grasping
+        # Physics settings for better contact/grasping - found from a repo online
         self.sim.physx.bounce_threshold_velocity = 0.01
         self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 1024 * 4
         self.sim.physx.gpu_total_aggregate_pairs_capacity = 16 * 1024
