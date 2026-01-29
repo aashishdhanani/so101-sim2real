@@ -30,14 +30,14 @@ Minimal observation set for task solvability:
 4. **Gripper state** - Open/close status
 
 ### Reward Design
-- **Alive**: Small positive reward for staying active
-- **Terminated**: Penalty for early termination
-- **Grasped**: Reward when object is close to EE and gripper is closed
-- **Object height**: Reward for lifting object higher
-- **Object dropped**: Penalty if object falls below end-effector
+- **Reach**: Dense reward for end-effector proximity to the object
+- **Lifted**: Reward for lifting the object above a minimum height
+- **Goal tracking**: Reward for moving the lifted object toward the goal pose
+- **Action rate**: Small penalty for large action changes
+- **Joint velocity**: Small penalty for fast joint motion
 
 ### Termination Conditions
-- **Timeout**: Episode length exceeded (20 seconds)
+- **Timeout**: Episode length exceeded (12 seconds)
 - **Out of bounds**: Robot joints exceed limits
 
 ## File Structure
@@ -67,17 +67,17 @@ Defines the simulation scene:
 - **Lighting**: Scene illumination
 
 ### RL Environment Configuration (`rl_env_cfg.py`)
-- **Observations**: Joint states, EE position, object position
-- **Actions**: Joint position control with limits
-- **Rewards**: Grasping, lifting, alive bonuses
+- **Observations**: Joint states, object position, goal position
+- **Actions**: Joint position control for arm, binary open/close for gripper
+- **Rewards**: Reach, lift, goal tracking, action smoothness
 - **Terminations**: Timeout, out of bounds
 - **Events**: Randomization of object position on reset
 
 ### Manager RL Environment (`manager_rl_env.py`)
 Aggregates all configurations into the main environment class:
 - Combines scene, observations, actions, rewards, terminations, events
-- Sets decimation (4 physics steps per environment step)
-- Sets episode length (20 seconds)
+- Sets decimation (2 physics steps per environment step)
+- Sets episode length (12 seconds)
 
 ## Training
 
@@ -100,7 +100,7 @@ python rl_task/train.py --num_envs 1 --wandb-project "my-experiment"
 - **Steps per env per iteration**: 24
 - **Learning epochs per iteration**: 5
 - **Mini-batches per epoch**: 4
-- **Episode length**: 20 seconds
+- **Episode length**: 12 seconds
 
 See `TRAINING_EXPLANATION.md` for detailed training structure.
 
@@ -112,7 +112,7 @@ See `TRAINING_EXPLANATION.md` for detailed training structure.
 3. Collisions detected
 4. Forces applied
 
-### Environment Step (every 4 physics steps, decimation=4):
+### Environment Step (every 2 physics steps, decimation=2):
 1. Get observations (joint pos, EE pos, object pos)
 2. Policy computes action
 3. Action applied to robot

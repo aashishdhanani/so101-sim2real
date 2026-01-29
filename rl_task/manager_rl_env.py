@@ -19,10 +19,12 @@ class So101EnvCfg(ManagerBasedRLEnvCfg):
     events:  EventsCfg = EventsCfg()
 
     decimation: int = 2
-    episode_length_s: float = 5.0
+    episode_length_s: float = 12.0
 
     def __post_init__(self):
         # Physics settings for better contact/grasping - found from a repo online
+        self.sim.dt = 0.01
+        self.sim.render_interval = self.decimation
         self.sim.physx.bounce_threshold_velocity = 0.01
         self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 1024 * 4
         self.sim.physx.gpu_total_aggregate_pairs_capacity = 16 * 1024
