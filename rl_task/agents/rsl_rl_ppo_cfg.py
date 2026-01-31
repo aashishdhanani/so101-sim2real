@@ -34,21 +34,16 @@ controls clipping, learning rate, entropy, GAE
 '''
 @configclass
 class So101PPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    num_steps_per_env = 24  
-    max_iterations = 1500   
-    save_interval = 50     
+    num_steps_per_env = 24
+    max_iterations = 1500
+    save_interval = 50
     experiment_name = "so101_lift"
-
-    obs_groups = {
-        "policy": ["policy"],
-        "critic": ["policy"],
-    }
-
+    empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
-        actor_hidden_dims=[256, 128, 64], 
-        critic_hidden_dims=[256, 128, 64], 
-        activation="elu",  
-        init_noise_std=1.0,   
+        init_noise_std=1.0,
+        actor_hidden_dims=[256, 128, 64],
+        critic_hidden_dims=[256, 128, 64],
+        activation="elu",
     )
 
     algorithm = RslRlPpoAlgorithmCfg(

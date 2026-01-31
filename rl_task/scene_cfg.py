@@ -1,5 +1,5 @@
 import os
-
+from dataclasses import MISSING
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, DeformableObjectCfg, RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
@@ -12,22 +12,10 @@ from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdF
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
-urdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "robot", "so101_new_calib.urdf"))
-cfg = UrdfConverterCfg(
-    asset_path=urdf_path,
-    fix_base=True,
-    joint_drive=UrdfConverterCfg.JointDriveCfg(
-        drive_type="force",
-        target_type="position",
-        gains=UrdfConverterCfg.JointDriveCfg.PDGainsCfg(
-            stiffness=1000.0, 
-            damping=100.0      
-        )
-    )
-)
+from pathlib import Path
+urdf_path = Path(__file__).resolve().parent.parent / "robot" / "so101_new_calib.urdf"
 
-converter = UrdfConverter(cfg=cfg)
-usd_path = converter.usd_path
+
 
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -46,16 +34,22 @@ class SceneCfg(InteractiveSceneCfg):
             },
             joint_vel={".*": 0.0},
         ),
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=usd_path,
+        spawn=sim_utils.UrdfFileCfg(
+            fix_base=True,
+            replace_cylinders_with_capsules=True,
+            asset_path=str(urdf_path),
+            activate_contact_sensors=False,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 disable_gravity=False,
                 max_depenetration_velocity=5.0,
             ),
             articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-                enabled_self_collisions=True, 
-                solver_position_iteration_count=8, 
-                solver_velocity_iteration_count=0
+                enabled_self_collisions=True,
+                solver_position_iteration_count=8,
+                solver_velocity_iteration_count=0,
+            ),
+            joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
+                gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0)
             ),
         ),
 
@@ -81,43 +75,45 @@ class SceneCfg(InteractiveSceneCfg):
             ),
             "gripper": ImplicitActuatorCfg(
                 joint_names_expr=["gripper"],
-                effort_limit_sim=4.0,  
+                effort_limit_sim=2.5,  
                 velocity_limit_sim=1.5,
-                stiffness=120.0, 
-                damping=30.0,  
+                stiffness=60.0, 
+                damping=20.0,  
             ),
         },
+        soft_joint_pos_limit_factor=0.9,
     )
-
+    
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/So101/base_link",
-        debug_vis=False,
+        debug_vis=True,
+        visualizer_cfg=MISSING,   # type: ignore[assignment]
         target_frames=[
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/So101/gripper_link",
                 name="end_effector",
                 offset=OffsetCfg(
-                    pos=(0.01, 0.0, -0.09),  
+                    pos=(0.01, 0.0, -0.09),
                 ),
             ),
         ],
     )
 
     object = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.12, 0, 0.055), rot=(1, 0, 0, 0)),
-        spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-            scale=(0.267, 0.267, 0.267),
-            rigid_props=RigidBodyPropertiesCfg(
-                solver_position_iteration_count=16,
-                solver_velocity_iteration_count=1,
-                max_angular_velocity=1000.0,
-                max_linear_velocity=1000.0,
-                max_depenetration_velocity=5.0,
-                disable_gravity=False,
+            prim_path="{ENV_REGEX_NS}/Object",
+            init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2, 0.0, 0.015), rot=(1, 0, 0, 0)),
+            spawn=UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
+                scale=(0.5, 0.5, 0.5),
+                rigid_props=RigidBodyPropertiesCfg(
+                    solver_position_iteration_count=16,
+                    solver_velocity_iteration_count=1,
+                    max_angular_velocity=1000.0,
+                    max_linear_velocity=1000.0,
+                    max_depenetration_velocity=5.0,
+                    disable_gravity=False,
+                ),
             ),
-        ),
     )
 
     table = AssetBaseCfg(
