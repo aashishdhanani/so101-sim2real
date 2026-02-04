@@ -1,151 +1,151 @@
 import argparse
+from pathlib import Path
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
 parser = argparse.ArgumentParser(
-    description="This script demonstrates adding a custom robot to an Isaac Lab environment."
+    description="This script demonstrates the SO101 robot scene with table and cube."
 )
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 
-# parse the arguments
 args_cli = parser.parse_args()
 
-# launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-import numpy as np
-import torch
-import os
-
-
 import isaaclab.sim as sim_utils
-from isaaclab.assets.articulation import ArticulationCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.sim.converters import UrdfConverter, UrdfConverterCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
-from isaaclab.assets import AssetBaseCfg
+from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
+from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
-# Convert URDF to USD
-urdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "robot", "so101_new_calib.urdf"))
-cfg = UrdfConverterCfg(
-    asset_path=urdf_path,
-    fix_base=True,
-    joint_drive=UrdfConverterCfg.JointDriveCfg(
-        drive_type="force",
-        target_type="position",
-        gains=UrdfConverterCfg.JointDriveCfg.PDGainsCfg(
-            stiffness=1000.0, 
-            damping=100.0      
-        )
-    )
-)
+urdf_path = Path(__file__).resolve().parent.parent / "robot" / "so101_new_calib.urdf"
 
-converter = UrdfConverter(cfg=cfg)
-usd_path = converter.usd_path
+class SceneCfg(InteractiveSceneCfg):
 
-# Define the robot configuration for Isaac Lab
-SO101_CONFIG = ArticulationCfg(
-    spawn=sim_utils.UsdFileCfg(
-        usd_path=usd_path,
-        rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
-            max_depenetration_velocity=5.0,
+    robot = ArticulationCfg(
+        prim_path="{ENV_REGEX_NS}/So101",
+        init_state=ArticulationCfg.InitialStateCfg(
+            rot=(1.0, 0.0, 0.0, 0.0),
+            joint_pos={
+                "shoulder_pan": 0.0,
+                "shoulder_lift": 0.0,
+                "elbow_flex": -0.0,
+                "wrist_flex": 1.57, 
+                "wrist_roll": -0.0,
+                "gripper": 0.0,
+            },
+            joint_vel={".*": 0.0},
         ),
-        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, 
-            solver_position_iteration_count=8, 
-            solver_velocity_iteration_count=0
+        spawn=sim_utils.UrdfFileCfg(
+            fix_base=True,
+            replace_cylinders_with_capsules=True,
+            asset_path=str(urdf_path),
+            activate_contact_sensors=False,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                disable_gravity=False,
+                max_depenetration_velocity=5.0,
+            ),
+            articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+                enabled_self_collisions=True,
+                solver_position_iteration_count=8,
+                solver_velocity_iteration_count=0,
+            ),
+            joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
+                gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0)
+            ),
         ),
-    ),
-    actuators={
-        "all_joints": ImplicitActuatorCfg(
-            joint_names_expr=[".*"], 
-            stiffness=None,  
-            damping=None,  
-        )
-    },
-)
-
-class NewRobotsSceneCfg(InteractiveSceneCfg):
-    """Designs the scene."""
-
-    # Ground-plane
-    ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg())
-
-    # lights
-    dome_light = AssetBaseCfg(
-        prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
+        actuators={
+            "arm": ImplicitActuatorCfg(
+                joint_names_expr=["shoulder_.*", "elbow_flex", "wrist_.*"],
+                effort_limit_sim=1.9,
+                velocity_limit_sim=1.5,  
+                stiffness={
+                    "shoulder_pan": 200.0,  
+                    "shoulder_lift": 170.0,
+                    "elbow_flex": 120.0,    
+                    "wrist_flex": 80.0,      
+                    "wrist_roll": 50.0,  
+                },
+                damping={
+                    "shoulder_pan": 80.0,
+                    "shoulder_lift": 65.0,
+                    "elbow_flex": 45.0,
+                    "wrist_flex": 30.0,
+                    "wrist_roll": 20.0,
+                },
+            ),
+            "gripper": ImplicitActuatorCfg(
+                joint_names_expr=["gripper"],
+                effort_limit_sim=2.5,  
+                velocity_limit_sim=1.5,
+                stiffness=60.0, 
+                damping=20.0,  
+            ),
+        },
+        soft_joint_pos_limit_factor=0.9,
     )
 
-    # robot - set prim_path directly with the ENV_REGEX_NS placeholder
-    so101 = ArticulationCfg(
-        prim_path="{ENV_REGEX_NS}/So101",  # This gets replaced with /World/envs/env_0/So101, etc.
-        spawn=SO101_CONFIG.spawn,
-        actuators=SO101_CONFIG.actuators,
+    object = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/Object",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2, 0.0, 0.015), rot=(1, 0, 0, 0)),
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
+            scale=(0.5, 0.5, 0.5),
+            rigid_props=RigidBodyPropertiesCfg(
+                solver_position_iteration_count=16,
+                solver_velocity_iteration_count=1,
+                max_angular_velocity=1000.0,
+                max_linear_velocity=1000.0,
+                max_depenetration_velocity=5.0,
+                disable_gravity=False,
+            ),
+        ),
+    )
+
+    table = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Table",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.5, 0.0, 0.0), rot=(0.707, 0, 0, 0.707)),
+        spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"),
+    )
+
+    plane = AssetBaseCfg(
+        prim_path="/World/GroundPlane",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0, 0, -1.05)),
+        spawn=GroundPlaneCfg(),
+    )
+
+    light = AssetBaseCfg(
+        prim_path="/World/light",
+        spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     sim_dt = sim.get_physics_dt()
-    sim_time = 0.0
-    count = 0
 
     while simulation_app.is_running():
-        # reset
-        if count % 500 == 0:
-            # reset counters
-            count = 0
-            # reset the scene entities to their initial positions offset by the environment origins
-            root_so101_state = scene["so101"].data.default_root_state.clone()
-            root_so101_state[:, :3] += scene.env_origins
-
-            # copy the default root state to the sim for the jetbot's orientation and velocity
-            scene["so101"].write_root_pose_to_sim(root_so101_state[:, :7])
-            scene["so101"].write_root_velocity_to_sim(root_so101_state[:, 7:])
-
-            # copy the default joint states to the sim
-            joint_pos, joint_vel = (
-                scene["so101"].data.default_joint_pos.clone(),
-                scene["so101"].data.default_joint_vel.clone(),
-            )
-            scene["so101"].write_joint_state_to_sim(joint_pos, joint_vel)
-            # clear internal buffers
-            scene.reset()
-            print("[INFO]: Resetting so101 state...")
-
-        # wave
-        wave_action = scene["so101"].data.default_joint_pos
-        wave_action[:, 0:4] = 0.25 * np.sin(2 * np.pi * 0.5 * sim_time)
-        scene["so101"].set_joint_position_target(wave_action)
-
         scene.write_data_to_sim()
         sim.step()
-        sim_time += sim_dt
-        count += 1
         scene.update(sim_dt)
 
 def main():
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = sim_utils.SimulationContext(sim_cfg)
     sim.set_camera_view((3.5, 0.0, 3.2), (0.0, 0.0, 0.5))
-    # Design scene
-    scene_cfg = NewRobotsSceneCfg(args_cli.num_envs, env_spacing=2.0)
+    
+    scene_cfg = SceneCfg(args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
-    # Play the simulator
     sim.reset()
-    # Now we are ready!
+    
     print("[INFO]: Setup complete...")
-    # Run the simulator
+    print("[INFO]: Scene contains robot, table, and cube - all stationary")
+    
     run_simulator(sim, scene)
 
 if __name__ == "__main__":
-
     main()
-
     simulation_app.close()
-
-
